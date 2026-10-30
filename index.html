@@ -1,0 +1,964 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>期中魔王週</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: a computer-graded answer sheet. Red ink rules frame everything; choices are bubbles you fill in.
+   One deliberate light look (paper + ink), so it reads on a classroom projector. */
+:root{
+  --paper:#f7f8f5;
+  --sheet:#ffffff;
+  --ink:#1c2130;
+  --ink-soft:#5b6170;
+  --rule:#d8432c;          /* answer-card red */
+  --rule-faint:rgba(216,67,44,.14);
+  --blue:#2350b8;
+  --blue-tint:#e6ecfa;
+  --orange:#d4680f;
+  --orange-tint:#fbeedf;
+  --good:#2f7d4f;
+  --bad:#b8321f;
+  --f-display:"LXGW WenKai TC","Kaiti TC","STKaiti","Noto Serif TC",serif;
+  --f-body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{min-height:100%}
+body{
+  margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.6;
+  background-image:linear-gradient(var(--rule-faint) 1px,transparent 1px);background-size:100% 32px;
+}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:3px solid var(--rule);outline-offset:2px}
+.wrap{max-width:1180px;margin:0 auto;padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--f-display);font-weight:700;text-wrap:balance;margin:0}
+.eyebrow{font-size:12px;letter-spacing:.14em;color:var(--rule);font-weight:700}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.btn{border:2px solid var(--ink);background:var(--ink);color:#fff;border-radius:999px;padding:10px 22px;font-weight:700}
+.btn:hover{background:#000}
+.btn.ghost{background:transparent;color:var(--ink)}
+.btn.ghost:hover{background:var(--sheet)}
+.btn[disabled]{opacity:.35;cursor:not-allowed}
+.link{background:none;border:0;color:var(--ink-soft);text-decoration:underline;padding:4px;font-size:13px}
+
+/* sheet frame */
+.sheet{background:var(--sheet);border:2px solid var(--rule);position:relative}
+.sheet::before{content:"";position:absolute;inset:4px;border:1px solid var(--rule-faint);pointer-events:none}
+
+/* ---------- start ---------- */
+.start{display:grid;gap:28px;padding-top:24px}
+.start-head{display:grid;gap:10px}
+.start h1{font-size:clamp(44px,9vw,88px);line-height:1.05;letter-spacing:.02em}
+.start h1 .boss{color:var(--rule)}
+.start p.lead{max-width:62ch;color:var(--ink-soft);margin:0}
+.roles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.role{text-align:left;padding:20px;display:grid;gap:6px;border-width:2px}
+.role:hover{transform:translateY(-2px)}
+.role .tag{font-size:13px;color:var(--ink-soft)}
+.role strong{font-family:var(--f-display);font-size:28px}
+.role.blue strong{color:var(--blue)}
+.role.orange strong{color:var(--orange)}
+.howto{padding:20px 22px;display:grid;gap:8px}
+.howto ol{margin:0;padding-left:1.3em;display:grid;gap:4px}
+@media (max-width:720px){.roles{grid-template-columns:1fr}}
+
+/* ---------- shared bits ---------- */
+.meter{display:grid;gap:6px}
+.meter-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.meter-label{font-size:13px;color:var(--ink-soft);font-weight:700;letter-spacing:.06em}
+.meter-val{font-family:var(--f-mono);font-weight:600;font-size:34px;line-height:1}
+.bubbles{display:grid;grid-template-columns:repeat(10,1fr);gap:4px}
+.bubbles i{display:block;height:16px;border:1.5px solid var(--rule);border-radius:999px;background:transparent;transition:background .5s}
+.bubbles i.on{background:var(--ink)}
+.bubbles i.hot{background:var(--bad);border-color:var(--bad)}
+.res{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:4px;border:1.5px solid var(--ink);border-radius:999px;padding:2px 10px;font-size:14px;background:var(--sheet)}
+.chip b{font-family:var(--f-mono)}
+.chip.zero{border-color:var(--bad);color:var(--bad)}
+.delta{font-family:var(--f-mono);font-weight:600;padding:2px 10px;border-radius:999px;font-size:18px}
+.delta.up{background:#fbe3de;color:var(--bad)}
+.delta.down{background:#dff1e6;color:var(--good)}
+.delta.flat{background:#eceef2;color:var(--ink-soft)}
+
+/* ---------- host ---------- */
+.host-top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
+.host-top h1{font-size:30px}
+.prog{display:flex;gap:8px;align-items:center}
+.prog span{width:34px;height:34px;border-radius:999px;border:2px solid var(--rule);display:grid;place-items:center;font-family:var(--f-mono);font-size:14px;color:var(--rule)}
+.prog span.done{background:var(--ink);border-color:var(--ink);color:#fff}
+.prog span.now{outline:3px solid var(--rule);outline-offset:2px;color:var(--ink);font-weight:600}
+.event{padding:22px 26px;margin-bottom:18px;display:grid;gap:8px}
+.event h2{font-size:clamp(28px,4vw,44px)}
+.event p{margin:0;font-size:clamp(17px,2vw,22px);max-width:60ch}
+.arena{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.side{padding:20px 22px;display:grid;gap:16px;align-content:start;border-width:3px}
+.side.blue{border-color:var(--blue);background:linear-gradient(var(--blue-tint),var(--sheet) 70%)}
+.side.orange{border-color:var(--orange);background:linear-gradient(var(--orange-tint),var(--sheet) 70%)}
+.side.blue::before,.side.orange::before{display:none}
+.side h3{font-size:32px}
+.side.blue h3{color:var(--blue)}
+.side.orange h3{color:var(--orange)}
+.side-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.status{font-weight:700;font-size:15px;padding:4px 12px;border-radius:999px;border:1.5px dashed var(--ink-soft);color:var(--ink-soft)}
+.status.ok{border-style:solid;border-color:var(--good);color:var(--good)}
+.pickrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;border-top:1px dashed var(--rule-faint);padding-top:12px}
+.pickrow small{color:var(--ink-soft);font-size:12px;width:100%}
+.bub{width:46px;height:46px;border-radius:999px;border:2px solid var(--rule);background:var(--sheet);font-family:var(--f-mono);font-weight:600;font-size:18px;color:var(--rule)}
+.bub.sel{background:var(--ink);border-color:var(--ink);color:#fff}
+.bub[disabled]{opacity:.25;cursor:not-allowed;text-decoration:line-through}
+.outcome-line{font-size:16px;margin:0}
+.notes{margin:0;padding-left:1.1em;font-size:14px;color:var(--ink-soft)}
+.host-actions{display:flex;justify-content:center;gap:12px;margin-top:22px;flex-wrap:wrap}
+.banner{margin-top:16px;padding:14px 18px;text-align:center;font-family:var(--f-display);font-size:22px}
+@media (max-width:760px){.arena{grid-template-columns:1fr}}
+
+/* ---------- reveal ---------- */
+.reveal-head{display:grid;gap:6px;margin-bottom:18px}
+.reveal-head h1{font-size:clamp(32px,5vw,52px)}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.col{padding:20px 22px;display:grid;gap:14px;align-content:start;border-width:3px}
+.col.blue{border-color:var(--blue)}
+.col.orange{border-color:var(--orange)}
+.col.blue::before,.col.orange::before{display:none}
+.col h2{font-size:30px}
+.col.blue h2{color:var(--blue)}
+.col.orange h2{color:var(--orange)}
+.story{margin:0;padding:12px 14px;border-left:4px solid currentColor;background:var(--paper);font-size:15px}
+.col.blue .story{color:var(--blue)}
+.col.orange .story{color:var(--orange)}
+.story span{color:var(--ink)}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.stat{border:1.5px solid var(--ink);padding:8px 10px;display:grid}
+.stat b{font-family:var(--f-mono);font-size:26px;line-height:1.1}
+.stat span{font-size:12px;color:var(--ink-soft)}
+.trail{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.trail li{display:grid;grid-template-columns:28px 1fr auto;gap:8px;align-items:start;border-top:1px dashed var(--rule-faint);padding-top:10px}
+.trail .rn{font-family:var(--f-mono);color:var(--rule);font-weight:600}
+.trail .ev{font-size:13px;color:var(--ink-soft)}
+.trail .ch{font-weight:700}
+.tag{display:inline-block;font-size:11px;letter-spacing:.06em;border:1px solid var(--ink-soft);border-radius:4px;padding:0 6px;margin-left:6px;color:var(--ink-soft);font-weight:500;vertical-align:2px}
+.lockn{font-size:12px;color:var(--bad)}
+.verdict{font-family:var(--f-display);font-size:22px;padding:10px 14px;background:var(--paper);border:1.5px solid var(--ink)}
+.discuss{margin-top:20px;padding:22px 26px;display:grid;gap:12px}
+.discuss h2{font-size:28px}
+.discuss ol{margin:0;padding-left:1.3em;display:grid;gap:8px;font-size:clamp(16px,1.8vw,20px)}
+.map{display:flex;flex-wrap:wrap;gap:8px;font-size:14px}
+.map span{border:1.5px solid var(--rule);color:var(--rule);padding:2px 10px;border-radius:999px;background:var(--sheet)}
+.map span b{color:var(--ink);font-weight:500;margin-left:4px}
+@media (max-width:760px){.cols{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr 1fr}}
+
+/* ---------- team phone ---------- */
+.phone{max-width:560px;margin:0 auto;display:grid;gap:14px}
+.tbar{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;color:#fff;border-radius:6px}
+.tbar.blue{background:var(--blue)}
+.tbar.orange{background:var(--orange)}
+.tbar h1{font-size:26px}
+.tbar .num{font-size:15px;opacity:.9}
+.card{padding:16px 18px;display:grid;gap:10px}
+.card h2{font-size:24px}
+.card p{margin:0}
+.secret{font-size:13px;color:var(--bad);font-weight:700}
+.opts{display:grid;gap:10px}
+.opt{display:grid;grid-template-columns:44px 1fr;gap:12px;align-items:center;text-align:left;padding:12px 14px;background:var(--sheet);border:1.5px solid var(--rule);border-radius:6px}
+.opt .b{width:40px;height:40px;border-radius:999px;border:2px solid var(--rule);display:grid;place-items:center;font-family:var(--f-mono);font-weight:600;color:var(--rule)}
+.opt.sel{border-color:var(--ink);box-shadow:0 0 0 2px var(--ink)}
+.opt.sel .b{background:var(--ink);border-color:var(--ink);color:#fff}
+.opt[disabled]{opacity:.45;cursor:not-allowed;background:repeating-linear-gradient(135deg,var(--sheet) 0 8px,#f1f1ef 8px 16px)}
+.opt .t{font-weight:700;display:block}
+.opt .c{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;font-size:13px;color:var(--ink-soft)}
+.opt .why{color:var(--bad);font-size:13px;font-weight:700}
+.tell{font-family:var(--f-display);font-size:22px;text-align:center;padding:14px;border:2px dashed var(--ink);border-radius:6px}
+.tell .bb{display:inline-grid;place-items:center;width:44px;height:44px;border-radius:999px;background:var(--ink);color:#fff;font-family:var(--f-mono);margin:0 4px}
+.center{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ---------- multiplayer additions ---------- */
+.field{display:grid;gap:6px}
+.field label{font-weight:700;font-size:14px}
+.field input{font:inherit;font-size:20px;padding:10px 14px;border:2px solid var(--ink);border-radius:6px;background:var(--sheet);color:var(--ink);width:100%}
+.field input:focus-visible{outline:3px solid var(--rule);outline-offset:1px}
+.teampick{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.teampick button{padding:16px;border:3px solid var(--ink);border-radius:6px;background:var(--sheet);font-family:var(--f-display);font-size:24px;font-weight:700}
+.teampick button.blue{color:var(--blue);border-color:var(--blue)}
+.teampick button.orange{color:var(--orange);border-color:var(--orange)}
+.teampick button.sel.blue{background:var(--blue);color:#fff}
+.teampick button.sel.orange{background:var(--orange);color:#fff}
+.conn{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-soft)}
+.conn i{width:9px;height:9px;border-radius:999px;background:var(--bad)}
+.conn.on i{background:var(--good)}
+.roster{display:flex;flex-wrap:wrap;gap:6px}
+.who{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;border:1.5px dashed var(--ink-soft);font-size:15px;color:var(--ink-soft);background:var(--sheet)}
+.who.done{border-style:solid;border-color:var(--good);color:var(--ink)}
+.who.done::after{content:"✓";color:var(--good);font-weight:700}
+.count{font-family:var(--f-mono);font-weight:600;font-size:18px}
+.manual{display:grid;gap:8px;border-top:1px dashed var(--rule-faint);padding-top:10px}
+.manual small{color:var(--ink-soft);font-size:12px}
+.mrow{display:flex;flex-wrap:wrap;gap:8px}
+.mcell{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--rule);border-radius:999px;padding:2px 4px 2px 12px;background:var(--sheet)}
+.mcell b{font-family:var(--f-mono);color:var(--rule)}
+.mcell button{width:30px;height:30px;border-radius:999px;border:1.5px solid var(--ink);background:var(--sheet);font-weight:700;line-height:1}
+.tally{display:grid;gap:6px}
+.tbarrow{display:grid;grid-template-columns:28px 1fr 32px;gap:8px;align-items:center;font-size:14px}
+.tbarrow b{font-family:var(--f-mono);color:var(--rule)}
+.tbarrow .track{height:14px;border:1.5px solid var(--rule);border-radius:999px;overflow:hidden;background:var(--sheet)}
+.tbarrow .fill{height:100%;background:var(--ink);transition:width .4s}
+.tbarrow .n{font-family:var(--f-mono);text-align:right}
+.boom{animation:boom 1s ease-in-out infinite}
+@keyframes boom{50%{transform:scale(1.03)}}
+.boomtag{display:inline-block;background:var(--bad);color:#fff;font-weight:700;padding:2px 10px;border-radius:999px;font-size:14px}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.small-btn{border:1.5px solid var(--ink);background:var(--sheet);border-radius:999px;padding:4px 12px;font-size:13px}
+.lobby{padding:24px 26px;display:grid;gap:12px;margin-bottom:18px}
+.lobby h2{font-size:clamp(28px,4vw,40px)}
+.lobby .big{font-size:clamp(18px,2vw,22px);margin:0}
+.guide{display:grid;gap:16px}
+.guide .sheet{padding:18px 22px;display:grid;gap:10px}
+.guide h2{font-size:26px}
+.guide h3{font-size:20px}
+.tablewrap{overflow-x:auto}
+.gt{border-collapse:collapse;width:100%;font-size:14px;min-width:560px}
+.gt th,.gt td{border-bottom:1px solid var(--rule-faint);padding:6px 8px;text-align:left;vertical-align:top}
+.gt th{font-size:12px;color:var(--ink-soft);letter-spacing:.06em}
+.gt td.num{font-family:var(--f-mono);white-space:nowrap}
+.guide ul{margin:0;padding-left:1.2em;display:grid;gap:4px}
+.wall{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+.note{padding:12px 14px;border-radius:4px;display:grid;gap:6px;transform:rotate(-.6deg)}
+.note:nth-child(even){transform:rotate(.8deg)}
+.note.blue{background:var(--blue-tint)}
+.note.orange{background:var(--orange-tint)}
+.note.host{background:#fde7e2;outline:2px solid var(--rule)}
+.note p{margin:0;font-family:var(--f-display);font-size:20px;line-height:1.35}
+.note span{font-size:12px;color:var(--ink-soft)}
+.gives{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.gives li{display:grid;grid-template-columns:minmax(80px,auto) 1fr;gap:10px;border-top:1px dashed var(--rule-faint);padding-top:8px;font-size:17px}
+.gives b{font-weight:700}
+.joinrow{display:grid;grid-template-columns:1fr auto;gap:20px;align-items:center}
+.qr{background:#fff;padding:10px;border:2px solid var(--ink);line-height:0}
+.qr img,.qr canvas{display:block}
+.url{font-family:var(--f-mono);font-size:14px;color:var(--ink-soft);word-break:break-all;margin:0}
+@media (max-width:700px){.joinrow{grid-template-columns:1fr}}
+.warnbox{border:2px dashed var(--bad);padding:12px 14px;border-radius:6px;font-size:14px}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+
+<script>
+(function(){
+"use strict";
+
+/* =============== game data =============== */
+const RES = {time:"⏰ 時間", money:"💰 金錢", support:"🤝 人脈", energy:"🔋 精力"};
+const RES_SHORT = {time:"⏰", money:"💰", support:"🤝", energy:"🔋"};
+const LET = ["A","B","C","D"];
+const TEAM_IDS = ["blue","orange"];
+const BOOM = 80;
+
+const TEAMS = {
+  blue:{
+    name:"藍隊",
+    story:"你家就在學校附近，爸媽支持你專心念書，不用打工。大一就加入系學會，認識不少學長姐和同學。",
+    start:{stress:40,res:{time:3,money:4,support:4,energy:3}}
+  },
+  orange:{
+    name:"橘隊",
+    story:"你從外縣市來念書，房租和生活費要靠自己打工。這學期剛轉進這個系，班上還沒有熟的人。",
+    start:{stress:50,res:{time:2,money:1,support:1,energy:3}},
+    chronic:3
+  }
+};
+
+/* tag = coping type from the textbook (problem / emotion / meaning focused, Folkman & Moskowitz)
+   lv  = where the resource comes from: 個人, 社會支持, 社區資源, 組織, 政策 */
+const ROUNDS = [
+  { title:"魔王降臨",
+    common:"期中週公告出爐：三科考試加兩份報告，全部擠在同一週。",
+    options:[
+      {label:"排一張讀書計畫表", tag:"問題焦點", lv:"個人", cost:{time:1}, d:-8, result:"把每天要讀的範圍寫清楚，心裡比較有底了。"},
+      {label:"揪同學組讀書會分工", tag:"問題焦點", lv:"社會支持", cost:{support:2}, d:-12, flag:"studygroup", result:"大家分工整理重點，一個人讀三科，變成三個人各讀一科。"},
+      {label:"加入系上的「期中互助群組」", tag:"情緒焦點", lv:"社區資源", cost:{time:1}, d:-7, flag:"mutualhelp", result:"群組裡有學長姐分享經驗，也有人半夜喊「我也還沒讀」，突然沒那麼孤單。"},
+      {label:"先追兩集劇壓壓驚", tag:"情緒焦點（迴避）", lv:"個人", cost:{}, d:-5, flag:"procrast", result:"看完心情好多了……但書一頁都沒翻。"}
+    ]},
+  { title:"週末",
+    common:"兩隊各自收到了一則訊息。",
+    byTeam:{
+      blue:{ text:"爸媽傳訊息：「這週末不用回家，專心讀書，便當幫你準備好了。」",
+        options:[
+          {label:"整天泡在圖書館", tag:"問題焦點", lv:"個人", cost:{energy:1}, d:-8, result:"讀完整整兩科，進度超前。"},
+          {label:"回家吃頓飯、跟家人聊聊", tag:"情緒焦點", lv:"社會支持", cost:{time:1}, gain:{energy:1}, d:-10, result:"吃飽睡飽，爸媽說考差也沒關係，週一精神超好。"},
+          {label:"跟讀書會夥伴對答案", tag:"問題焦點", lv:"社會支持", cost:{support:1}, d:-8, result:"對完才發現搞錯一個觀念，幸好提早發現。"}
+        ]},
+      orange:{ text:"打工店長傳訊息：「週末缺人，你可以多排兩班嗎？不來的話，這個月可能要少排你的班。」",
+        options:[
+          {label:"硬著頭皮去上班", tag:"問題焦點", lv:"個人", cost:{energy:1,time:1}, gain:{money:1}, d:6, result:"錢是賺到了，但回家只剩洗澡的力氣。"},
+          {label:"請假專心讀書", tag:"問題焦點", lv:"個人", cost:{money:1}, d:-2, result:"書讀了一些，但一直在想下個月的房租怎麼辦。"},
+          {label:"拜託同事幫忙代班", tag:"問題焦點", lv:"社會支持", cost:{support:1}, d:-4, result:"同事爽快答應了，不過你欠了一個人情。"},
+          {label:"向學校申請生活助學金", tag:"問題焦點", lv:"組織", cost:{time:1}, gain:{money:1}, d:-3, result:"填了一疊表格、跑了兩趟生輔組，但下個月房租總算有著落。"}
+        ]}
+    }},
+  { title:"筆電當機",
+    common:"報告寫到一半，筆電突然黑屏，檔案還在裡面！",
+    options:[
+      {label:"送修，再買一台新的頂著用", tag:"問題焦點", lv:"個人", cost:{money:3}, d:-8, result:"隔天就有新電腦，檔案也救回來了。"},
+      {label:"去學校電腦教室重寫", tag:"問題焦點", lv:"組織", cost:{time:1,energy:1}, d:0, result:"電腦教室排隊排好久，還得從頭重寫一半，至少有地方可以寫。"},
+      {label:"跟同學借筆電", tag:"問題焦點", lv:"社會支持", cost:{support:1}, d:-5, result:"同學把電腦借你，還幫你找回雲端備份。"},
+      {label:"在期中互助群組發文求救", tag:"問題焦點", lv:"社區資源", cost:{}, req:"mutualhelp", d:-6, result:"群組裡有學長借你備用筆電，還有人教你從暫存檔救回報告。"}
+    ]},
+  { title:"組員失聯",
+    common:"小組報告剩三天，有兩位組員已讀不回。",
+    options:[
+      {label:"自己全部扛下來", tag:"問題焦點", lv:"個人", cost:{energy:2}, d:5, result:"報告是生出來了，你也快燒乾了。"},
+      {label:"寫信請老師協助協調", tag:"問題焦點", lv:"組織", cost:{}, d:-4, result:"老師回信說會處理，也讓你們延後一天交。"},
+      {label:"打電話給組員，重新分工", tag:"問題焦點", lv:"社會支持", cost:{support:1}, d:-8, result:"打過去才知道他們生病了，大家重新分好工作。"},
+      {label:"把這次當成練習帶團隊的機會", tag:"意義焦點", lv:"個人", cost:{}, d:-3, result:"換個角度看，心裡比較不委屈，也想好下次分組要先約定規則。"}
+    ]},
+  { title:"考前一晚",
+    common:"明天第一科就要考了，躺在床上翻來覆去睡不著。",
+    options:[
+      {label:"爬起來熬夜硬讀", tag:"問題焦點", lv:"個人", cost:{energy:1}, d:6, result:"多讀了十頁，但考試時一直打哈欠。"},
+      {label:"告訴自己：這只是期中，不是人生", tag:"意義焦點", lv:"個人", cost:{}, d:-6, result:"換個角度想，好像沒那麼可怕，慢慢睡著了。"},
+      {label:"傳訊息找朋友聊一下", tag:"情緒焦點", lv:"社會支持", cost:{support:1}, d:-9, result:"朋友說他也很緊張，兩個人互相打氣。"},
+      {label:"去諮商中心的「考前紓壓夜」", tag:"情緒焦點", lv:"社區資源", cost:{time:1}, d:-8, result:"和一群不認識的同學一起做放鬆練習，發現大家都一樣緊張。"}
+    ]},
+  { title:"源頭的力量",
+    common:"系上開會，想聽學生對期中週的意見。有同學發起聯署：「建議各科考試與報告錯開，並開放部分科目翻書考。」",
+    final:true,
+    options:[
+      {label:"簽名聯署，也出席會議發言", tag:"問題焦點", lv:"政策", cost:{energy:1}, d:0, result:"你簽了名，也去開會說了自己的經驗。"},
+      {label:"算了，反正也改變不了", tag:"不參與", lv:"個人", cost:{}, d:0, result:"你決定把力氣留給自己。"}
+    ]}
+];
+const N = ROUNDS.length;
+
+const NOTE = {
+  P:"上週追的劇，這週要還：壓力 +8",
+  S:"讀書會夥伴半夜傳來重點整理：壓力 −6",
+  R:"房租還沒著落，心裡一直掛著：壓力 +3",
+  E:"精力歸零，連休息都覺得累：壓力 +5",
+  X:"壓力爆表！腦袋一片空白：精力 −1",
+  F1:"壓力的源頭變小了：壓力 −15",
+  F2:"花了力氣卻沒結果，有點洩氣：壓力 +2"
+};
+const HEADLINE = [
+  "聯署成功！系上決定下學期起，考試和報告錯開，部分科目開放翻書考。",
+  "聯署人數不夠，系上說「會再研究看看」。",
+  "沒有人站出來，系上覺得「學生應該沒意見」，期中週照舊。"
+];
+
+/* =============== engine =============== */
+const clone = o => JSON.parse(JSON.stringify(o));
+const clamp = v => Math.max(0, Math.min(100, v));
+function optionsFor(r, team){ const R = ROUNDS[r]; return R.byTeam ? R.byTeam[team].options : R.options; }
+function textFor(r, team){ const R = ROUNDS[r]; return R.byTeam ? R.byTeam[team].text : R.common; }
+function afford(T, o){ const cost = o.cost||{}; if (o.req && !(T.flags||{})[o.req]) return false; return Object.keys(cost).every(k => T.res[k] >= cost[k]); }
+function lackText(T, o){ if (o.req && !(T.flags||{})[o.req]) return "要先加入期中互助群組才能用"; const cost = o.cost||{}; return Object.keys(cost).filter(k => T.res[k] < cost[k]).map(k => `需要 ${RES_SHORT[k]}${cost[k]}，你們只有 ${T.res[k]}`).join("；"); }
+function lockedCount(T, r, team){ return optionsFor(r, team).filter(o => !afford(T, o)).length; }
+function newTeam(team){ const s = TEAMS[team].start; return {stress:s.stress, res:clone(s.res), flags:{}}; }
+
+function apply(T, r, team, idx){
+  const opt = optionsFor(r, team)[idx];
+  const T2 = clone(T); const n = []; let d = opt.d;
+  const l = lockedCount(T, r, team);
+  for (const k in (opt.cost||{})) T2.res[k] = Math.max(0, T2.res[k] - opt.cost[k]);
+  for (const k in (opt.gain||{})) T2.res[k] += opt.gain[k];
+  if (opt.flag) T2.flags[opt.flag] = true;
+  if (r === 1 && T.flags.procrast){ d += 8; n.push("P"); }
+  if (r === 4 && T.flags.studygroup){ d -= 6; n.push("S"); }
+  if (TEAMS[team].chronic){ d += TEAMS[team].chronic; n.push("R"); }
+  if (T2.res.energy <= 0){ d += 5; n.push("E"); }
+  T2.stress = clamp(T.stress + d);
+  if (T2.stress >= BOOM){ n.push("X"); T2.res.energy = Math.max(0, T2.res.energy - 1); }
+  return {T:T2, entry:{i:idx, d:T2.stress - T.stress, n, l}};
+}
+function applyFinal(teams, picks){
+  const signs = {blue: picks.blue === 0, orange: picks.orange === 0};
+  const head = signs.blue && signs.orange ? 0 : (signs.blue || signs.orange) ? 1 : 2;
+  const out = {teams:{}, entries:{}, head};
+  for (const team of TEAM_IDS){
+    const T = teams[team]; const opt = ROUNDS[N-1].options[picks[team]];
+    const l = lockedCount(T, N-1, team);
+    const T2 = clone(T); const n = []; let d = 0;
+    for (const k in (opt.cost||{})) T2.res[k] = Math.max(0, T2.res[k] - opt.cost[k]);
+    if (head === 0){ d = -15; n.push("F1"); }
+    else if (signs[team]){ d = 2; n.push("F2"); }
+    T2.stress = clamp(T.stress + d);
+    out.teams[team] = T2; out.entries[team] = {i:picks[team], d:T2.stress - T.stress, n, l};
+  }
+  return out;
+}
+function verdict(stress){
+  if (stress <= 30) return {k:"蓬勃成長", t:"不只撐過來，還長出新的能力和人際連結。"};
+  if (stress <= 60) return {k:"復原", t:"撐過去了，回到原本的狀態，沒有更好也沒有更糟。"};
+  return {k:"困擾累積", t:"考完了，但累積的疲憊還沒散，下一個魔王來時會更辛苦。"};
+}
+/* majority: highest count wins; a tie is settled by drawing lots among the tied options */
+function decide(counts){
+  const max = Math.max(...counts);
+  if (max <= 0) return null;
+  const tied = counts.map((c,i)=>c===max?i:-1).filter(i=>i>=0);
+  return {i: tied[Math.floor(Math.random()*tied.length)], tie: tied.length > 1};
+}
+
+/* =============== storage =============== */
+function load(key){ try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : null; } catch(e){ return null; } }
+function save(key, v){ try { localStorage.setItem(key, JSON.stringify(v)); } catch(e){} }
+function drop(key){ try { localStorage.removeItem(key); } catch(e){} }
+
+/* =============== helpers =============== */
+const app = document.getElementById("app");
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const $ = id => document.getElementById(id);
+const on = (id, fn) => { const el = $(id); if (el) el.onclick = fn; };
+function meter(stress, label){
+  const lit = Math.round(stress/10); let b = "";
+  for (let i=0;i<10;i++) b += `<i class="${i<lit ? (stress>=70?'hot':'on') : ''}"></i>`;
+  const boom = stress >= BOOM;
+  return `<div class="meter${boom?' boom':''}"><div class="meter-top"><span class="meter-label">${label||"壓力值"} ${boom?'<span class="boomtag">爆表</span>':''}</span><span class="meter-val">${stress}</span></div><div class="bubbles">${b}</div></div>`;
+}
+function resChips(res){ return `<div class="res">${Object.keys(RES).map(k=>`<span class="chip${res[k]<=0?' zero':''}">${RES[k]} <b>${res[k]}</b></span>`).join("")}</div>`; }
+function costText(o){
+  const c = Object.keys(o.cost||{}).map(k=>`花 ${RES_SHORT[k]}${o.cost[k]}`);
+  const g = Object.keys(o.gain||{}).map(k=>`得 ${RES_SHORT[k]}${o.gain[k]}`);
+  const all = c.concat(g); return all.length ? all : ["不用花資源"];
+}
+function deltaBadge(d){ const cls = d>0?"up":d<0?"down":"flat"; return `<span class="delta ${cls}">${d>0?"+":""}${d}</span>`; }
+function notesList(n){ return n && n.length ? `<ul class="notes">${n.map(c=>`<li>${esc(NOTE[c])}</li>`).join("")}</ul>` : ""; }
+function tallyBars(counts, opts){
+  const total = counts.reduce((a,b)=>a+b,0) || 1;
+  return `<div class="tally">${opts.map((o,i)=>`<div class="tbarrow"><b>${LET[i]}</b><div class="track"><div class="fill" style="width:${Math.round(counts[i]/total*100)}%"></div></div><span class="n">${counts[i]}</span></div>`).join("")}</div>`;
+}
+function connChip(){
+  if (!ROOM) return `<span class="conn"><i></i>未連線</span>`;
+  const n = Object.keys(PLAYERS).length;
+  return `<span class="conn${CONNECTED?' on':''}"><i></i>${CONNECTED?`已連線 · ${n} 位玩家`:"連線中…"}</span>`;
+}
+
+/* =============== Firebase (realtime sync) =============== */
+/* 把 Firebase 主控台給你的 firebaseConfig 貼在這裡 */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAPsAbaRBWl90_gcAYX__OF6PvEwxnGv7o",
+  authDomain: "psychology-ec407.firebaseapp.com",
+  databaseURL: "https://psychology-ec407-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "psychology-ec407",
+  storageBucket: "psychology-ec407.firebasestorage.app",
+  messagingSenderId: "17174452216",
+  appId: "1:17174452216:web:4c6647ce24007958ee680d"
+};
+const GAME = "midterm";
+let ROOM = null, ROOM_TRIED = false, CONNECTED = false, STATE = null, PLAYERS = {};
+const PID = (() => { try { let v = sessionStorage.getItem("mwk-pid"); if (!v){ v = "p" + Math.random().toString(36).slice(2,10); sessionStorage.setItem("mwk-pid", v); } return v; } catch(e){ return "p" + Math.random().toString(36).slice(2,10); } })();
+function configured(){ return window.firebase && FIREBASE_CONFIG.databaseURL && FIREBASE_CONFIG.databaseURL.indexOf("http") === 0; }
+function base(){ return ROOM.ref("games/" + GAME); }
+function toArr(x){ if (!x) return []; if (Array.isArray(x)) return x; return Object.keys(x).sort((a,b)=>a-b).map(k=>x[k]); }
+/* Firebase drops empty objects/arrays, so rebuild the shape the game expects */
+function normState(st){
+  if (!st) return null;
+  st.teams = st.teams || {}; st.hist = st.hist || {};
+  for (const t of TEAM_IDS){
+    const T = st.teams[t] || newTeam(t); T.flags = T.flags || {}; T.res = Object.assign({time:0,money:0,support:0,energy:0}, T.res || {}); st.teams[t] = T;
+    st.hist[t] = toArr(st.hist[t]).map(e => e ? Object.assign({}, e, {n: toArr(e.n), v: e.v ? toArr(e.v) : null}) : e);
+  }
+  if (st.head === undefined) st.head = null;
+  return st;
+}
+function startRoom(){
+  if (ROOM_TRIED) return; ROOM_TRIED = true;
+  if (!configured()){ ROOM = null; rerender(); return; }
+  try {
+    if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+    ROOM = firebase.database();
+  } catch(e){ ROOM = null; rerender(); return; }
+  ROOM.ref(".info/connected").on("value", s => { CONNECTED = !!s.val(); if (CONNECTED) pushPresence(); rerender(); });
+  base().child("players").on("value", s => { PLAYERS = s.val() || {}; onRoomChange(); });
+  base().child("state").on("value", s => { STATE = normState(s.val()); onRoomChange(); });
+  pushPresence();
+}
+let presenceTimer = null;
+function pushPresence(){
+  if (!ROOM) return;
+  clearTimeout(presenceTimer);
+  presenceTimer = setTimeout(() => {
+    if (MODE === "host") base().child("state").set(JSON.parse(JSON.stringify(hostPublic()))).catch(()=>{});
+    else if (MODE === "player" && ME.name && ME.team){
+      const ref = base().child("players/" + PID);
+      ref.set({name:ME.name, team:ME.team, r:ME.r, pick:(ME.pick===null?-1:ME.pick), cheer:ME.cheer||"", give:ME.give||"", ep:ME.ep||0, at:firebase.database.ServerValue.TIMESTAMP}).catch(()=>{});
+      ref.onDisconnect().remove();
+    }
+  }, 80);
+}
+function clearPlayers(){ if (ROOM) base().child("players").remove().catch(()=>{}); }
+function onRoomChange(){
+  if (MODE === "host"){ renderHostSoft(); }
+  else if (MODE === "player"){
+    if (PSCREEN === "join") return;
+    if (ME.name && ME.team && ROOM && CONNECTED && !PLAYERS[PID]) pushPresence();
+    if (EDITING){ const st = hostState(); if (st && st.phase === "recharge") return; EDITING = false; }
+    renderPlayer();
+  }
+}
+function rerender(){ if (MODE === "host") renderHostSoft(); else if (MODE === "player" && PSCREEN !== "join" && !EDITING) renderPlayer(); }
+
+/* =============== routing =============== */
+let MODE = "start";
+function route(){
+  const h = (location.hash||"").replace("#","");
+  if (h === "host"){ MODE = "host"; startRoom(); renderHost(); pushPresence(); return; }
+  if (h === "play"){ MODE = "player"; startRoom(); renderPlayer(); return; }
+  MODE = "start"; renderStart();
+}
+window.addEventListener("hashchange", route);
+function go(h){ if (location.hash.replace("#","") === h) route(); else location.hash = h; }
+
+/* =============== start =============== */
+function renderStart(){
+  app.innerHTML = `
+  <div class="start">
+    <div class="start-head">
+      <span class="eyebrow">社區心理學 · 壓力與因應</span>
+      <h1>期中<span class="boss">魔王</span>週</h1>
+      <p class="lead">兩隊面對同一個期中週。每個人用自己的手機投票，隊上最多人選的做法就是全隊的決定。你只看得到自己隊伍的狀況。</p>
+    </div>
+    <div class="roles" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+      <button class="sheet role" data-go="play"><span class="tag">用自己的手機</span><strong>加入遊戲</strong><span>輸入代號、選隊伍，等主持人開始。</span></button>
+      <button class="sheet role" data-go="host"><span class="tag">投影在大螢幕</span><strong>主持人</strong><span>看誰選好了、控制關卡、最後一起揭曉。</span></button>
+    </div>
+  </div>`;
+  app.querySelectorAll("[data-go]").forEach(b => b.onclick = () => go(b.dataset.go));
+}
+
+/* =============== host =============== */
+const HKEY = "mwk-host-v2";
+function newHost(){
+  return {phase:"lobby", round:0, teams:{blue:newTeam("blue"),orange:newTeam("orange")}, hist:{blue:[],orange:[]},
+          manual:{blue:[0,0,0,0],orange:[0,0,0,0]}, head:null, ties:{}, bots:[], view:"game", showManual:false, confirmReset:false, epoch:Date.now()};
+}
+let H = load(HKEY) || newHost();
+if (!H.epoch) H.epoch = Date.now();
+function saveH(){ save(HKEY, H); pushPresence(); }
+function hostPublic(){ return {phase:H.phase, round:H.round, teams:H.teams, hist:H.hist, head:H.head, epoch:H.epoch}; }
+
+/* players: real ones from the room (deduped by team + name), plus host-only test bots */
+function players(){
+  const map = {};
+  for (const pr of Object.values(PLAYERS)){
+    if (!pr || !pr.name || !TEAM_IDS.includes(pr.team)) continue;
+    const key = pr.team + "|" + String(pr.name).slice(0,12);
+    const at = pr.at || 0;
+    if (!map[key] || map[key].at < at) map[key] = {name:String(pr.name).slice(0,12), team:pr.team, r:pr.r, pick:(pr.pick>=0?pr.pick:null), cheer:typeof pr.cheer==="string"?pr.cheer.slice(0,40):"", give:typeof pr.give==="string"?pr.give.slice(0,40):"", ep:pr.ep, at, bot:false};
+  }
+  for (const b of H.bots) map[b.team+"|"+b.name] = {name:b.name, team:b.team, r:b.r, pick:b.pick, cheer:b.cheer||"", give:b.give||"", ep:H.epoch, bot:true};
+  return Object.values(map);
+}
+function teamCounts(team){
+  const opts = optionsFor(H.round, team); const counts = opts.map(()=>0);
+  for (const p of players()) if (p.team === team && p.ep === H.epoch && p.r === H.round && Number.isInteger(p.pick) && p.pick >= 0 && p.pick < opts.length && afford(H.teams[team], opts[p.pick])) counts[p.pick]++;
+  const man = H.manual[team] || [];
+  return counts.map((c,i)=>c + (man[i]||0));
+}
+
+let botTimers = [];
+function scheduleBots(){
+  botTimers.forEach(clearTimeout); botTimers = [];
+  if (H.phase !== "vote") return;
+  H.bots.forEach((b) => {
+    if (b.r === H.round && b.pick !== null) return;
+    botTimers.push(setTimeout(() => {
+      const opts = optionsFor(H.round, b.team).map((o,i)=>afford(H.teams[b.team],o)?i:-1).filter(i=>i>=0);
+      b.r = H.round; b.pick = opts[Math.floor(Math.random()*opts.length)];
+      save(HKEY,H); renderHostSoft();
+    }, 800 + Math.random()*3500));
+  });
+}
+
+let hostRenderQueued = false;
+function renderHostSoft(){ if (MODE !== "host") return; if (document.activeElement && document.activeElement.id === "hc") return; if (hostRenderQueued) return; hostRenderQueued = true; requestAnimationFrame(()=>{ hostRenderQueued = false; renderHost(); }); }
+
+function renderHost(){
+  if (H.view === "guide") return renderGuide();
+  if (H.phase === "reveal") return renderReveal(true);
+  if (H.phase === "recharge") return renderRecharge();
+  const all = players();
+  let prog = "";
+  for (let i=0;i<N;i++){
+    const done = H.phase !== "lobby" && H.phase !== "story" && (i < H.round || (i === H.round && H.phase === "result"));
+    const now = (H.phase === "vote" || H.phase === "result") && i === H.round && !done;
+    prog += `<span class="${done?'done':now?'now':''}">${i+1}</span>`;
+  }
+  const top = `
+    <div class="host-top">
+      <div class="toolbar"><h1>期中魔王週</h1>${connChip()}</div>
+      <div class="prog" aria-label="關卡進度">${prog}</div>
+    </div>`;
+
+  const rosterOf = team => {
+    const ps = all.filter(p=>p.team===team);
+    const voted = p => H.phase === "vote" && p.ep === H.epoch && p.r === H.round && Number.isInteger(p.pick);
+    return {ps, html: ps.length ? `<div class="roster">${ps.map(p=>`<span class="who${voted(p)?' done':''}">${p.bot?'🤖':''}${esc(p.name)}</span>`).join("")}</div>` : `<p style="margin:0;color:var(--ink-soft)">還沒有人加入</p>`, votedN: ps.filter(voted).length};
+  };
+
+  let main = "";
+  if (H.phase === "lobby" || H.phase === "story"){
+    const lobbyCopy = H.phase === "lobby"
+      ? `<div class="joinrow"><div><h2>掃描 QR code 加入遊戲</h2><p class="big">輸入代號、選隊伍，等主持人開始。</p><p class="url">${esc(location.href.split("#")[0] + "#play")}</p></div><div id="qr" class="qr" aria-label="加入遊戲的 QR code"></div></div>`
+      : `<h2>兩隊正在看自己的處境</h2><p class="big">請先讀手機上「你們的處境」。這是你們隊的秘密，先不要給另一隊看。</p>`;
+    main = `<div class="sheet lobby"><span class="eyebrow">${H.phase==='lobby'?'等待加入':'準備開始'}</span>${lobbyCopy}</div>
+      <div class="arena">${TEAM_IDS.map(team=>{ const r = rosterOf(team); return `<section class="sheet side ${team}">
+        <div class="side-head"><h3>${TEAMS[team].name}</h3><span class="count">${r.ps.length} 人</span></div>${r.html}</section>`; }).join("")}</div>`;
+  } else {
+    const R = ROUNDS[H.round];
+    main = `<div class="sheet event"><span class="eyebrow">第 ${H.round+1} 關 / 共 ${N} 關</span><h2>${esc(R.title)}</h2><p>${esc(R.common)}</p></div>
+      <div class="arena">${TEAM_IDS.map(team=>{
+        const T = H.teams[team]; const r = rosterOf(team);
+        let extra = "";
+        if (H.phase === "vote"){
+          const opts = optionsFor(H.round, team);
+          extra = `<div class="side-head"><span>投票進度</span><span class="count">${r.votedN} / ${r.ps.length}</span></div>${r.html}
+            ${H.showManual ? `<div class="manual"><small>手動補票：給沒辦法用手機的同學，舉手後由主持人加票</small><div class="mrow">${opts.map((o,i)=>`<span class="mcell"><b>${LET[i]}</b><span class="num">${H.manual[team][i]||0}</span><button data-m="${team}:${i}:-1" aria-label="${LET[i]} 減一票">−</button><button data-m="${team}:${i}:1" aria-label="${LET[i]} 加一票" ${afford(T,o)?'':'disabled'}>+</button></span>`).join("")}</div></div>` : ""}`;
+        } else {
+          const e = H.hist[team][H.round];
+          extra = `<div class="side-head"><span>這一關的變化</span>${deltaBadge(e.d)}</div>${H.ties[team+H.round]?`<p style="margin:0;font-size:14px;color:var(--ink-soft)">隊內平手，抽籤決定</p>`:""}${T.stress>=BOOM?`<p style="margin:0" class="boomtag">壓力爆表</p>`:""}`;
+        }
+        return `<section class="sheet side ${team}"><div class="side-head"><h3>${TEAMS[team].name}</h3></div>${meter(T.stress)}${extra}</section>`;
+      }).join("")}</div>
+      ${H.phase==='result' && H.round===N-1 && H.head!==null ? `<div class="sheet banner">${esc(HEADLINE[H.head])}</div>` : ""}`;
+  }
+
+  let actions = "";
+  const total = TEAM_IDS.map(t=>players().filter(p=>p.team===t).length);
+  if (H.phase === "lobby") actions = `<button class="btn" id="toStory" ${total[0]+total[1]>0?'':'disabled'}>開始遊戲：先看處境</button>`;
+  else if (H.phase === "story") actions = `<button class="btn" id="toVote">開始第 1 關</button>`;
+  else if (H.phase === "vote"){
+    const ready = TEAM_IDS.every(t => teamCounts(t).some(c=>c>0));
+    actions = `<button class="btn" id="closeVote" ${ready?'':'disabled'}>截止投票，揭曉本關</button>${ready?'':'<span style="color:var(--ink-soft);font-size:14px">兩隊都至少要有一票</span>'}`;
+  }
+  else if (H.phase === "result") actions = H.round < N-1 ? `<button class="btn" id="nextRound">下一關 →</button>` : `<button class="btn" id="toReveal">全部揭曉 →</button>`;
+
+  const tools = `<div class="host-actions toolbar" style="justify-content:center">
+      ${H.phase==='vote'?`<button class="small-btn" id="tManual">${H.showManual?'收起手動補票':'手動補票'}</button>`:""}
+      <button class="small-btn" id="tGuide">主持人手冊</button>
+      <button class="small-btn" id="tBots">${H.bots.length?`移除測試玩家（${H.bots.length}）`:"加入測試玩家"}</button>
+      ${H.confirmReset ? `<span>確定清空重來？</span><button class="small-btn" id="resetYes">清空重來</button><button class="link" id="resetNo">取消</button>` : `<button class="link" id="resetBtn">重新開始</button>`}
+      <button class="link" id="homeBtn">回首頁</button>
+    </div>`;
+
+  app.innerHTML = top + (ROOM ? "" : `<div class="warnbox" style="margin-bottom:14px">還沒連上 Firebase：請確認檔案裡的 FIREBASE_CONFIG 已經貼上，而且網路正常。沒連上時，可以用「手動補票」和「測試玩家」照常進行。</div>`) + main + `<div class="host-actions">${actions}</div>` + tools;
+  const qr = $("qr");
+  if (qr && window.QRCode){ try { new QRCode(qr, {text: location.href.split("#")[0] + "#play", width: 220, height: 220, correctLevel: QRCode.CorrectLevel.M}); } catch(e){} }
+
+  app.querySelectorAll("[data-m]").forEach(b => b.onclick = () => {
+    const [t,i,d] = b.dataset.m.split(":"); const arr = H.manual[t]; arr[+i] = Math.max(0,(arr[+i]||0)+(+d)); saveH(); renderHost();
+  });
+  on("toStory", () => { H.phase = "story"; saveH(); renderHost(); });
+  on("toVote", () => { H.phase = "vote"; H.round = 0; H.manual = {blue:[0,0,0,0],orange:[0,0,0,0]}; saveH(); scheduleBots(); renderHost(); });
+  on("closeVote", () => {
+    const picks = {}, entries = {};
+    for (const t of TEAM_IDS){
+      const counts = teamCounts(t); const dcs = decide(counts);
+      picks[t] = dcs.i; H.ties[t+H.round] = dcs.tie; entries[t] = {counts};
+    }
+    if (H.round === N-1){
+      const out = applyFinal(H.teams, picks);
+      for (const t of TEAM_IDS){ H.teams[t] = out.teams[t]; H.hist[t][H.round] = Object.assign(out.entries[t], {v:entries[t].counts, tie:H.ties[t+H.round]}); }
+      H.head = out.head;
+    } else {
+      for (const t of TEAM_IDS){ const {T, entry} = apply(H.teams[t], H.round, t, picks[t]); H.teams[t] = T; H.hist[t][H.round] = Object.assign(entry, {v:entries[t].counts, tie:H.ties[t+H.round]}); }
+    }
+    H.phase = "result"; saveH(); renderHost();
+  });
+  on("nextRound", () => { H.round++; H.phase = "vote"; H.manual = {blue:[0,0,0,0],orange:[0,0,0,0]}; saveH(); scheduleBots(); renderHost(); });
+  on("toReveal", () => { H.phase = "reveal"; saveH(); renderHost(); window.scrollTo(0,0); });
+  on("tManual", () => { H.showManual = !H.showManual; save(HKEY,H); renderHost(); });
+  on("tGuide", () => { H.view = "guide"; save(HKEY,H); renderHost(); window.scrollTo(0,0); });
+  on("tBots", () => {
+    if (H.bots.length){ H.bots = []; }
+    else { H.bots = ["阿明","小美","大雄","靜香","胖虎","小夫","阿花","小傑"].map((n,i)=>({name:n, team:i%2?"orange":"blue", r:-1, pick:null})); }
+    saveH(); scheduleBots(); renderHost();
+  });
+  on("resetBtn", () => { H.confirmReset = true; renderHost(); });
+  on("resetNo", () => { H.confirmReset = false; renderHost(); });
+  on("resetYes", () => { const bots = H.bots.map(b=>({name:b.name,team:b.team,r:-1,pick:null})); clearPlayers(); H = newHost(); H.bots = bots; saveH(); renderHost(); });
+  on("homeBtn", () => go(""));
+}
+if (H.phase === "vote") setTimeout(scheduleBots, 0);
+
+/* =============== recharge station: cheers + resources to offer =============== */
+const BOT_CHEERS = ["考完一起去吃火鍋！","你已經比昨天的自己更努力了","睡飽也是一種讀書","期中只是一站，不是終點","有問題隨時敲我","記得喝水"];
+const BOT_GIVES = ["我有統計的筆記可以借","可以一起去圖書館陪讀","我會做考前重點整理","我可以幫忙看報告格式","我有多一台平板可以借","可以陪你練習口頭報告"];
+function scheduleBotWall(){
+  H.bots.forEach((b,i) => {
+    if (b.cheer) return;
+    setTimeout(() => { b.cheer = BOT_CHEERS[i % BOT_CHEERS.length]; b.give = BOT_GIVES[i % BOT_GIVES.length]; save(HKEY,H); renderHostSoft(); }, 700 + Math.random()*3000);
+  });
+}
+function renderRecharge(){
+  const ps = players();
+  const cheers = ps.filter(p=>p.cheer);
+  const gives = ps.filter(p=>p.give);
+  app.innerHTML = `
+    <div class="host-top"><div class="toolbar"><h1>補血站</h1>${connChip()}</div><span class="count">${cheers.length} / ${ps.length} 人已留言</span></div>
+    <div class="sheet lobby"><span class="eyebrow">日常振奮 · 互惠支持</span><h2>個人因應有極限，所以我們才需要社區心理學</h2>
+      <p class="big">歡迎寫一句給大家的打氣話。如果你有資源可以提供或願意提供，也歡迎寫在下方。</p></div>
+    <div class="cols">
+      <section class="sheet col"><h2>給全班的一句話</h2>
+        <div class="wall">${cheers.length ? cheers.map(p=>`<div class="note ${p.team}"><p>${esc(p.cheer)}</p><span>${p.bot?'🤖':''}${esc(p.name)}</span></div>`).join("") : `<p style="margin:0;color:var(--ink-soft)">留言會出現在這裡</p>`}</div>
+      </section>
+      <section class="sheet col"><h2>我可以提供的資源</h2>
+        <ul class="gives">${gives.length ? gives.map(p=>`<li><b>${p.bot?'🤖':''}${esc(p.name)}</b><span>${esc(p.give)}</span></li>`).join("") : `<li style="color:var(--ink-soft)">資源會出現在這裡</li>`}</ul>
+      </section>
+    </div>
+    <div class="sheet discuss"><h2>為什麼要互相提供資源？</h2>
+      <p style="margin:0;font-size:clamp(16px,1.8vw,19px)">課本提到 Maton 的研究：既給予又接受支持的人，幸福感最高。互助團體的「助人者治療原則」也是這樣，幫助別人的同時，自己也被支持了。看看右邊的清單，期中週有需要時，就去找那位同學吧。</p>
+      <p style="margin:0;font-family:var(--f-display);font-size:clamp(20px,2.4vw,26px)">與其一個人扛下所有，不如一群人一起擺爛……我是說，一起分工。:D</p>
+    </div>
+    <div class="host-actions"><button class="btn ghost" id="backReveal">回到揭曉畫面</button>
+      ${H.confirmReset ? `<span>確定清空重來？</span><button class="small-btn" id="resetYes">清空重來</button><button class="link" id="resetNo">取消</button>` : `<button class="link" id="resetBtn">重新開始</button>`}</div>`;
+  on("backReveal", () => { H.phase = "reveal"; saveH(); renderHost(); window.scrollTo(0,0); });
+  on("resetBtn", () => { H.confirmReset = true; renderHost(); });
+  on("resetNo", () => { H.confirmReset = false; renderHost(); });
+  on("resetYes", () => { const bots = H.bots.map(b=>({name:b.name,team:b.team,r:-1,pick:null})); clearPlayers(); H = newHost(); H.bots = bots; saveH(); renderHost(); });
+}
+if (H.phase === "recharge") setTimeout(scheduleBotWall, 0);
+
+/* =============== reveal (host, and players at the end) =============== */
+function renderReveal(isHost, st){
+  const S = isHost ? hostPublic() : st;
+  const col = team => {
+    const T0 = TEAMS[team].start, T = S.teams[team], hist = S.hist[team] || [];
+    const lockedTotal = hist.reduce((s,e)=>s+(e?e.l:0),0);
+    const boomRounds = hist.filter(e=>e && e.n.includes("X")).length;
+    const v = verdict(T.stress);
+    const fin = hist[N-1]; const empowered = fin && fin.i === 0 && S.head === 0;
+    return `<section class="sheet col ${team}">
+      <h2>${TEAMS[team].name}</h2>
+      <p class="story">他們的處境：<span>${esc(TEAMS[team].story)}</span></p>
+      <div class="stats">
+        <div class="stat"><b>${T0.stress} → ${T.stress}</b><span>起始 → 最後壓力</span></div>
+        <div class="stat"><b style="color:var(--bad)">${lockedTotal}</b><span>因資源不足選不了的選項</span></div>
+        <div class="stat"><b style="color:var(--bad)">${boomRounds}</b><span>壓力爆表的關卡數</span></div>
+      </div>
+      <div><span class="meter-label">起始資源</span>${resChips(T0.res)}</div>
+      <ol class="trail">${hist.map((e,r)=>{ if(!e) return ""; const o = optionsFor(r,team)[e.i]; return `<li>
+        <span class="rn">${r+1}</span>
+        <div><div class="ev">${esc(ROUNDS[r].title)}：${esc(textFor(r,team))}</div>
+          <div class="ch">選 ${LET[e.i]}｜${esc(o.label)}<span class="tag">${esc(o.tag)}</span><span class="tag">${esc(o.lv)}</span></div>
+          ${e.v?`<div style="font-size:12px;color:var(--ink-soft)">隊內票數：${e.v.map((c,i)=>`${LET[i]} ${c}`).join("、")}${e.tie?"（平手抽籤）":""}</div>`:""}
+          ${e.l?`<div class="lockn">這一關有 ${e.l} 個選項選不了</div>`:""}
+          ${notesList(e.n)}
+        </div>${deltaBadge(e.d)}</li>`; }).join("")}</ol>
+      <div class="verdict">${v.k}${empowered?"＋增權":""}<div style="font-family:var(--f-body);font-size:15px">${v.t}${empowered?" 你們參與的聯署真的改變了系上的規則。":""}</div></div>
+    </section>`;
+  };
+  const html = `
+    <div class="reveal-head"><span class="eyebrow">全部揭曉</span><h1>同一個期中週，兩種處境</h1>
+      ${S.head!==null && S.head!==undefined?`<p style="margin:0">最後一關：${esc(HEADLINE[S.head])}</p>`:""}</div>
+    <div class="cols">${col("blue")}${col("orange")}</div>
+    <div class="sheet discuss">
+      <h2>一起想想</h2>
+      <ol>
+        <li>兩隊的選擇其實很像嗎？為什麼結果差那麼多？</li>
+        <li>橘隊：有沒有很想選、卻因為資源不夠選不了的做法？那是什麼感覺？</li>
+        <li>最後的聯署，如果兩隊一開始就能互相溝通，結果會不一樣嗎？為什麼聯署也需要「精力」？</li>
+        <li>藍隊大多靠個人和朋友解決，橘隊有沒有用到互助群組、學校制度這些社區資源？這些資源對誰最重要？</li>
+        <li>回到真實的期中週：哪些壓力靠個人因應就好，哪些得從源頭改變？</li>
+      </ol>
+      <div class="map">
+        <span>遠端脈絡因素<b>兩隊的處境</b></span>
+        <span>慢性壓力源<b>橘隊的房租</b></span>
+        <span>近端壓力源<b>每一關的事件</b></span>
+        <span>因應資源<b>⏰💰🤝🔋</b></span>
+        <span>因應類型<b>問題／情緒／意義焦點</b></span>
+        <span>互助團體<b>期中互助群組</b></span>
+        <span>組織層次<b>助學金、電腦教室、老師協調</b></span>
+        <span>惡性與良性循環<b>拖延、爆表；讀書會、互助群組</b></span>
+        <span>政治行動<b>最後一關的聯署</b></span>
+        <span>正向結果<b>蓬勃成長、復原、增權</b></span>
+      </div>
+    </div>`;
+  if (!isHost) return html;
+  app.innerHTML = html + `<div class="host-actions">
+      <button class="btn" id="toRecharge">進入補血站 →</button>
+      <button class="btn ghost" id="backBtn">回到遊戲畫面</button>
+      <button class="small-btn" id="tGuide">主持人手冊</button>
+      ${H.confirmReset ? `<span>確定清空重來？</span><button class="small-btn" id="resetYes">清空重來</button><button class="link" id="resetNo">取消</button>` : `<button class="link" id="resetBtn">重新開始</button>`}
+    </div>`;
+  on("backBtn", () => { H.phase = "result"; saveH(); renderHost(); });
+  on("toRecharge", () => { H.phase = "recharge"; saveH(); scheduleBotWall(); renderHost(); window.scrollTo(0,0); });
+  on("tGuide", () => { H.view = "guide"; save(HKEY,H); renderHost(); window.scrollTo(0,0); });
+  on("resetBtn", () => { H.confirmReset = true; renderHost(); });
+  on("resetNo", () => { H.confirmReset = false; renderHost(); });
+  on("resetYes", () => { const bots = H.bots.map(b=>({name:b.name,team:b.team,r:-1,pick:null})); clearPlayers(); H = newHost(); H.bots = bots; saveH(); renderHost(); });
+}
+
+/* =============== host guide: every round, option and rule =============== */
+function renderGuide(){
+  const optTable = (opts, fin) => `<div class="tablewrap"><table class="gt"><thead><tr><th>選項</th><th>做法</th><th>因應類型</th><th>資源層次</th><th>花費／獲得</th><th>壓力</th><th>結果文字</th></tr></thead><tbody>
+    ${opts.map((o,i)=>`<tr><td class="num">${LET[i]}</td><td>${esc(o.label)}${o.flag?`<br><small style="color:var(--ink-soft)">${({procrast:'下一關壓力 +8',studygroup:'第 5 關壓力 −6',mutualhelp:'解鎖第 3 關的群組求救'})[o.flag]}</small>`:""}${o.req?`<br><small style="color:var(--ink-soft)">要先加入互助群組</small>`:""}</td><td>${esc(o.tag)}</td><td>${esc(o.lv)}</td><td>${costText(o).join("、")}</td><td class="num">${fin?'見規則':(o.d>0?'+':'')+o.d}</td><td>${esc(o.result)}</td></tr>`).join("")}
+  </tbody></table></div>`;
+  app.innerHTML = `<div class="guide">
+    <div class="host-top"><h1>主持人手冊</h1><button class="btn ghost" id="gBack">回到遊戲</button></div>
+    <div class="warnbox">這頁有所有答案和隱藏規則，投影前請先切回遊戲畫面。</div>
+    <section class="sheet"><h2>兩隊的起始處境</h2>
+      ${TEAM_IDS.map(t=>`<h3 style="color:var(--${t})">${TEAMS[t].name}</h3><p style="margin:0">${esc(TEAMS[t].story)}</p><div>起始壓力 <b class="num">${TEAMS[t].start.stress}</b></div>${resChips(TEAMS[t].start.res)}`).join("")}
+    </section>
+    <section class="sheet"><h2>隱藏規則</h2><ul>
+      <li>投票：每個人投一票，隊上最多票的選項就是全隊的決定。平手時從平手的選項中抽籤。</li>
+      <li>資源不夠的選項會鎖住，手機上看得到還差多少；鎖住的選項不計票。</li>
+      <li>慢性壓力：橘隊第 1 到 5 關，每一關壓力都會額外 +3（房租）。</li>
+      <li>拖延：第 1 關選「先追兩集劇」，第 2 關壓力額外 +8。</li>
+      <li>讀書會：第 1 關選「揪同學組讀書會」，第 5 關壓力額外 −6（良性循環）。</li>
+      <li>互助群組：第 1 關選「加入期中互助群組」，第 3 關才能選「在群組發文求救」。這是給人脈少的人的社區資源，橘隊也負擔得起。</li>
+      <li>因應類型依課本分三種：問題焦點、情緒焦點、意義焦點。另一個標籤是資源層次：個人、社會支持、社區資源、組織、政策。</li>
+      <li>精力歸零：任何一關結束時精力是 0，壓力額外 +5。</li>
+      <li>爆表：壓力達到 ${BOOM} 以上，計量條會閃紅，並且精力再 −1（更容易精力歸零，形成惡性循環）。壓力最高 100、最低 0。</li>
+      <li>第 6 關聯署：兩隊都選 A，兩隊壓力都 −15；只有一隊選 A，那隊 +2；都沒選就不變。選 A 要花 🔋1，精力 0 的隊伍選不了。</li>
+      <li>最後判定（Kloos 的結果）：壓力 30 以下「蓬勃成長」，31 到 60「復原」，61 以上「困擾累積」。聯署成功且有參與的隊伍，加上「增權」。</li>
+      <li>補血站：揭曉後按「進入補血站」，每個人在手機寫一句打氣話和一個能提供的資源，即時出現在大螢幕。</li>
+    </ul></section>
+    ${ROUNDS.map((R,r)=>`<section class="sheet"><span class="eyebrow">第 ${r+1} 關</span><h2>${esc(R.title)}</h2>
+      ${R.byTeam ? TEAM_IDS.map(t=>`<h3 style="color:var(--${t})">${TEAMS[t].name}看到的事件</h3><p style="margin:0">${esc(R.byTeam[t].text)}</p>${optTable(R.byTeam[t].options)}`).join("")
+                 : `<p style="margin:0">${esc(R.common)}</p>${optTable(R.options, !!R.final)}`}
+    </section>`).join("")}
+    <section class="sheet"><h2>測試方式</h2><ul>
+      <li>按「加入測試玩家」會加入 8 位電腦玩家（藍橘各 4 位），它們會在每一關隨機投票，你可以一個人從頭跑到尾。</li>
+      <li>想試試手機畫面：在同一個瀏覽器多開幾個分頁，或用自己的手機，按「加入遊戲」輸入不同代號。每個分頁都算一位玩家。</li>
+      <li>測完按「重新開始」清空；測試玩家會保留，再按一次「移除測試玩家」就好。</li>
+    </ul></section>
+  </div>`;
+  on("gBack", () => { H.view = "game"; save(HKEY,H); renderHost(); window.scrollTo(0,0); });
+}
+
+/* =============== player =============== */
+/* per tab (sessionStorage), so several tabs in one browser can each be a different player */
+const PKEY = "mwk-player-v2";
+function loadTab(){ try { const v = sessionStorage.getItem(PKEY); return v ? JSON.parse(v) : null; } catch(e){ return null; } }
+let ME = Object.assign({name:"", team:null, r:-1, pick:null, cheer:"", give:""}, loadTab() || {});
+let EDITING = false;
+let PSCREEN = ME.name && ME.team ? "game" : "join";
+function saveMe(){ try { sessionStorage.setItem(PKEY, JSON.stringify({name:ME.name, team:ME.team, r:ME.r, pick:ME.pick, cheer:ME.cheer, give:ME.give, wallDone:ME.wallDone, ep:ME.ep})); } catch(e){} pushPresence(); }
+function hostState(){ return STATE; }
+function teamPeers(team){
+  const map = {};
+  for (const pr of Object.values(PLAYERS)){ if (pr && pr.team===team && pr.name && (!STATE || pr.ep === STATE.epoch)){ const k = String(pr.name); if (!map[k] || (map[k].at||0) < (pr.at||0)) map[k] = Object.assign({}, pr, {pick: pr.pick>=0 ? pr.pick : null}); } }
+  return Object.values(map);
+}
+
+function renderPlayer(){
+  if (PSCREEN === "join") return renderJoin();
+  const st = hostState(); const team = ME.team; const name = TEAMS[team].name;
+  const head = `<div class="tbar ${team}"><h1>${name}</h1><span class="num">${esc(ME.name)}${st && (st.phase==='vote'||st.phase==='result')?` · 第 ${st.round+1}/${N} 關`:""}</span></div>`;
+  const foot = `<div class="center">${connChip()}<button class="link" id="changeMe">改代號或隊伍</button></div>`;
+
+  if (!ROOM && ROOM_TRIED){
+    app.innerHTML = `<div class="phone">${head}<div class="sheet card"><h2>沒辦法連上遊戲</h2><p>這支手機無法和主持人連線。沒關係，每一關請舉手把你的選擇告訴主持人，主持人會幫你加票。</p><p style="color:var(--ink-soft);font-size:14px">請確認手機有網路，再重新整理一次頁面。</p></div>${foot}</div>`;
+    on("changeMe", () => { PSCREEN = "join"; renderPlayer(); });
+    return;
+  }
+  if (st && st.epoch && ME.ep !== st.epoch){ ME.ep = st.epoch; ME.r = -1; ME.pick = null; ME.cheer = ""; ME.give = ""; ME.wallDone = false; saveMe(); }
+  if (!st){
+    app.innerHTML = `<div class="phone">${head}<div class="sheet card"><h2>等主持人上線…</h2><p>主持人打開遊戲後，這裡會自動更新。</p></div>${foot}</div>`;
+    on("changeMe", () => { PSCREEN = "join"; renderPlayer(); });
+    return;
+  }
+  const T = st.teams[team];
+  const status = `<div class="sheet card">${meter(T.stress, "我們隊的壓力值")}${resChips(T.res)}</div>`;
+  let body = "";
+  if (st.phase === "lobby"){
+    const mates = teamPeers(team).map(p=>p.name);
+    body = `<div class="sheet card"><h2>你已加入${name}</h2><p>等主持人開始遊戲。</p><div class="roster">${mates.map(n=>`<span class="who done">${esc(n)}</span>`).join("")}</div></div>`;
+  } else if (st.phase === "story"){
+    body = `${status}<div class="sheet card"><span class="secret">這是你們隊的處境，先不要給另一隊看！</span><h2>你們的處境</h2><p>${esc(TEAMS[team].story)}</p>
+      <p style="color:var(--ink-soft);font-size:14px">上面是你們隊現在的壓力值和資源。每個做法都可能要花資源，資源不夠的做法就選不了。每一關每個人投一票，隊上最多票的做法就是全隊的決定。</p></div>`;
+  } else if (st.phase === "vote"){
+    const r = st.round; const R = ROUNDS[r]; const opts = optionsFor(r, team);
+    if (ME.r !== r){ ME.r = r; ME.pick = null; saveMe(); }
+    const mates = teamPeers(team);
+    const counts = opts.map((_,i)=>mates.filter(m=>m.r===r && m.pick===i).length);
+    const votedN = mates.filter(m=>m.r===r && Number.isInteger(m.pick)).length;
+    body = `${status}<div class="sheet card"><span class="eyebrow">第 ${r+1} 關</span><h2>${esc(R.title)}</h2><p>${esc(textFor(r, team))}</p></div>
+      <div class="opts">${opts.map((o,i)=>{ const ok = afford(T, o);
+        return `<button class="opt${ME.pick===i?' sel':''}" data-i="${i}" ${ok?'':'disabled'}><span class="b">${LET[i]}</span>
+          <span><span class="t">${esc(o.label)}</span><span class="c">${costText(o).map(x=>`<span>${x}</span>`).join("")}</span>${ok?'':`<span class="why">${esc(lackText(T,o))}</span>`}</span></button>`; }).join("")}</div>
+      <div class="sheet card"><div class="side-head"><b>隊內即時票數</b><span class="num">${votedN} / ${mates.length} 人已投</span></div>${tallyBars(counts, opts)}
+        <p style="font-size:13px;color:var(--ink-soft)">${ME.pick===null?"點一個選項投票。主持人截止前都可以改。":`你投了 ${LET[ME.pick]}，主持人截止前都可以改。`}</p></div>`;
+  } else if (st.phase === "result"){
+    const r = st.round; const e = (st.hist[team]||[])[r];
+    if (e){
+      const o = optionsFor(r, team)[e.i];
+      body = `<div class="tell">全隊決定：<span class="bb">${LET[e.i]}</span>${esc(o.label)}</div>
+        ${status}
+        <div class="sheet card"><p>${esc(o.result)}</p>
+          ${e.v?`<p style="font-size:13px;color:var(--ink-soft)">隊內票數：${e.v.map((c,i)=>`${LET[i]} ${c}`).join("、")}${e.tie?"（平手，抽籤決定）":""}</p>`:""}
+          <div class="side-head"><span>壓力變化</span>${deltaBadge(e.d)}</div>${notesList(e.n)}
+          ${r===N-1 && st.head!==null ? `<p><b>${esc(HEADLINE[st.head])}</b></p>` : ""}
+        </div>
+        <p style="text-align:center;color:var(--ink-soft)">等主持人進入下一關…</p>`;
+    }
+  } else if (st.phase === "recharge"){
+    const done = !!(ME.cheer || ME.give || ME.wallDone);
+    if (!done || EDITING){
+      EDITING = true;
+      app.innerHTML = `<div class="phone">${head}<div class="sheet card"><span class="eyebrow">補血站</span><h2>幫彼此補一點血</h2>
+        <div class="field"><label for="ch">歡迎寫一句給大家的打氣話</label><input id="ch" maxlength="40" autocomplete="off" value="${esc(ME.cheer)}" placeholder="例如：考完一起去吃火鍋！"></div>
+        <div class="field"><label for="gv">如果你有資源可以提供或願意提供，也歡迎寫在這裡</label><input id="gv" maxlength="40" autocomplete="off" value="${esc(ME.give)}" placeholder="例如：我有統計筆記可以借、可以陪讀"></div>
+        <div class="center"><button class="btn" id="sendWall">送到大螢幕</button><button class="link" id="skipWall">先不寫</button></div>
+        <p id="wallMsg" style="margin:0;color:var(--bad);font-size:14px" hidden></p></div>${foot}</div>`;
+      on("sendWall", () => {
+        const c = $("ch").value.trim().slice(0,40), g = $("gv").value.trim().slice(0,40);
+        ME.cheer = c; ME.give = g; ME.wallDone = true; EDITING = false; saveMe(); renderPlayer();
+      });
+      on("skipWall", () => { ME.wallDone = true; EDITING = false; saveMe(); renderPlayer(); });
+      on("changeMe", () => { EDITING = false; PSCREEN = "join"; renderPlayer(); });
+      return;
+    }
+    body = `<div class="sheet card"><h2>${ME.cheer||ME.give?"已送到大螢幕":"謝謝參與"}</h2>${ME.cheer?`<p>你的打氣話：${esc(ME.cheer)}</p>`:""}${ME.give?`<p>你提供的資源：${esc(ME.give)}</p>`:""}${!ME.cheer&&!ME.give?`<p>看看大螢幕上大家寫了什麼，想到了也可以再補上。</p>`:""}<div class="center"><button class="btn ghost" id="editWall">${ME.cheer||ME.give?"修改":"我想寫"}</button></div></div>`;
+  } else if (st.phase === "reveal"){
+    body = `<div class="sheet card"><h2>遊戲結束</h2><p>兩隊的故事揭曉了，請看大螢幕，或往下滑看完整結果。</p></div>` + renderReveal(false, st);
+    app.innerHTML = `<div class="phone" style="max-width:1100px">${head}${body}${foot}</div>`;
+    on("changeMe", () => { PSCREEN = "join"; renderPlayer(); });
+    return;
+  }
+  app.innerHTML = `<div class="phone">${head}${body}${foot}</div>`;
+  app.querySelectorAll(".opt").forEach(b => b.onclick = () => { ME.r = st.round; ME.pick = +b.dataset.i; saveMe(); renderPlayer(); });
+  on("editWall", () => { EDITING = true; renderPlayer(); });
+  on("changeMe", () => { PSCREEN = "join"; renderPlayer(); });
+}
+
+function renderJoin(){
+  let team = ME.team;
+  app.innerHTML = `<div class="phone">
+    <div class="start-head" style="padding-top:12px"><span class="eyebrow">加入遊戲</span><h1 style="font-size:44px">期中<span style="color:var(--rule)">魔王</span>週</h1></div>
+    <div class="sheet card">
+      <div class="field"><label for="nm">你的代號（最多 12 個字）</label><input id="nm" maxlength="12" autocomplete="off" value="${esc(ME.name)}" placeholder="例如：民雄小貓"></div>
+      <div class="field"><label>選隊伍（聽主持人分配）</label><div class="teampick"><button id="pb" class="blue${team==='blue'?' sel':''}">藍隊</button><button id="po" class="orange${team==='orange'?' sel':''}">橘隊</button></div></div>
+      <div class="center"><button class="btn" id="joinBtn">加入</button></div>
+      <p id="joinMsg" style="margin:0;color:var(--bad);font-size:14px" hidden></p>
+    </div>
+    <div class="center"><button class="link" id="homeBtn">回首頁</button></div>
+  </div>`;
+  const setTeam = t => { team = t; $("pb").classList.toggle("sel", t==="blue"); $("po").classList.toggle("sel", t==="orange"); };
+  on("pb", () => setTeam("blue")); on("po", () => setTeam("orange"));
+  on("joinBtn", () => {
+    const nm = $("nm").value.trim().slice(0,12);
+    const msg = $("joinMsg");
+    if (!nm){ msg.textContent = "請先輸入代號。"; msg.hidden = false; return; }
+    if (!team){ msg.textContent = "請選一個隊伍。"; msg.hidden = false; return; }
+    ME.name = nm; ME.team = team; ME.pick = null; saveMe(); PSCREEN = "game"; renderPlayer(); window.scrollTo(0,0);
+  });
+  on("homeBtn", () => go(""));
+}
+
+route();
+})();
+</script>
+</body>
+</html>
